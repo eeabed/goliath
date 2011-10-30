@@ -30,7 +30,7 @@ module Goliath
       request['query'] = env[QUERY_STRING]
 
       old_stream_send = env[STREAM_SEND]
-      env[STREAM_SEND]  = proc { |data| env.handler.send_text_frame(data) }
+      env[STREAM_SEND]  = proc { |data, frame_type| env.handler.send_frame(frame_type, data) }
       env[STREAM_CLOSE] = proc { env.handler.close_websocket }
       env[STREAM_START] = proc { }
 
