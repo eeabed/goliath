@@ -49,8 +49,8 @@ module Goliath
           @parent.on_close(@env)
         end
 
-        def trigger_on_message(msg)
-          @parent.on_message(@env, msg)
+        def trigger_on_message(msg, frame_type)
+          @parent.on_message(@env, msg, frame_type)
         end
 
         def send_data(data)
