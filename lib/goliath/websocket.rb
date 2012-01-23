@@ -30,15 +30,17 @@ module Goliath
       request['query'] = env[QUERY_STRING]
 
       old_stream_send = env[STREAM_SEND]
+      old_stream_close = env[STREAM_CLOSE]
       env[STREAM_SEND]  = proc { |data, frame_type| env.handler.send_frame(frame_type, data) }
       env[STREAM_CLOSE] = proc { env.handler.close_websocket }
       env[STREAM_START] = proc { }
 
       conn = Class.new do
-        def initialize(env, parent, stream_send)
+        def initialize(env, parent, stream_send, connection_close)
           @env = env
           @parent = parent
           @stream_send = stream_send
+          @connection_close = connection_close
         end
 
         def trigger_on_open
@@ -53,10 +55,15 @@ module Goliath
           @parent.on_message(@env, msg, frame_type)
         end
 
+        def close_connection_after_writing
+          @connection_close.call
+        end
+
         def send_data(data)
           @stream_send.call(data)
         end
-      end.new(env, self, old_stream_send)
+
+      end.new(env, self, old_stream_send, old_stream_close)
 
       upgrade_data = env[UPGRADE_DATA]
 

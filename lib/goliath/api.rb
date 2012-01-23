@@ -36,6 +36,15 @@ module Goliath
       def middlewares
         @middlewares ||= []
 
+        unless @loaded_superclass_middlewares
+          if self.superclass != Goliath::API
+            @middlewares = self.superclass.middlewares + @middlewares
+            @middlewares = @middlewares.uniq
+          end
+
+          @loaded_superclass_middlewares = true
+        end
+
         unless @loaded_default_middlewares
           @middlewares.unshift([::Goliath::Rack::DefaultResponseFormat, nil, nil])
           @middlewares.unshift([::Rack::ContentLength, nil, nil])
@@ -73,6 +82,7 @@ module Goliath
         end
 
         @middlewares << [name, args, block]
+        @middlewares = @middlewares.uniq
       end
 
       # Returns the plugins configured for this API
@@ -107,15 +117,14 @@ module Goliath
       # Specify a router map to be used by the API
       #
       # @example
-      #  map '/version' do
-      #    run Proc.new {|env| [200, {"Content-Type" => "text/html"}, ["Version 0.1"]] }
-      #  end
+      #  map '/version', ApiClass
       #
       # @example
-      #  map '/user/:id', :id => /\d+/ do
-      #    # params[:id] will be a number
-      #    run Proc.new {|env| [200, {"Content-Type" => "text/html"}, ["Loading user #{params[:id]}"]] }
+      #  map '/version_get', ApiClass do
+      #    # inject GET validation middleware for this specific route
+      #    use Goliath::Rack::Validation::RequestMethod, %w(GET)
       #  end
+      #
       #
       # @param name [String] The URL path to map.
       #   Optional parts are supported via <tt>(.:format)</tt>, variables as <tt>:var</tt> and globs via <tt>*remaining_path</tt>.
@@ -156,6 +165,16 @@ module Goliath
         router.default(app)
         other_paths.each {|path| router.add(path).to(app) }
       end
+    end
+    
+    ##
+    # The default constructor does nothing with the options
+    # passed, redefine your own to use them.
+    # 
+    # @param [Hash] opts options passed to a map call if any
+    # 
+    def initialize(opts = {})
+      @opts = opts
     end
 
     # Default stub method to add options into the option parser.
@@ -287,7 +306,7 @@ module Goliath
       if self.class.maps?
         response = self.class.router.recognize(env)
         if response = self.class.router.recognize(env) and response.respond_to?(:path) and response.path.route.api_class
-          env.event_handler = response.path.route.api_class.new
+          env.event_handler = response.path.route.api_class.new(response.path.route.api_options)
         end
       end
       env.event_handler ||= self
